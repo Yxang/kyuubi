@@ -2315,6 +2315,32 @@
         </profile>
 
         <profile>
+            <id>spark-3.4</id>
+            <modules>
+                <module>extensions/spark/kyuubi-extension-spark-common</module>
+                <module>extensions/spark/kyuubi-extension-spark-3-4</module>
+                <module>extensions/spark/kyuubi-spark-connector-hive</module>
+            </modules>
+            <dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.threeten</groupId>
+                        <artifactId>threeten-extra</artifactId>
+                        <version>${threeten.version}</version>
+                    </dependency>
+                </dependencies>
+            </dependencyManagement>
+            <properties>
+                <spark.version>3.4.0</spark.version>
+                <spark.binary.version>3.4</spark.binary.version>
+                <delta.version>2.4.0rc1</delta.version>
+                <threeten.version>1.7.0</threeten.version>
+                <spark.archive.name>spark-${spark.version}-bin-hadoop3.tgz</spark.archive.name>
+                <maven.plugin.scalatest.exclude.tags>org.scalatest.tags.Slow,org.apache.kyuubi.tags.HudiTest</maven.plugin.scalatest.exclude.tags>
+            </properties>
+        </profile>
+
+        <profile>
             <id>spark-master</id>
             <properties>
                 <spark.version>3.5.0-SNAPSHOT</spark.version>
