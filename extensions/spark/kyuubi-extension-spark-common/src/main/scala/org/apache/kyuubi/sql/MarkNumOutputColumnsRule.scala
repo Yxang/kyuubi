@@ -18,7 +18,7 @@
 package org.apache.kyuubi.sql
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Union, V2WriteCommand}
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Union, V2CreateTablePlan, V2WriteCommand}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.command.DataWritingCommand
@@ -37,6 +37,7 @@ case class MarkNumOutputColumnsRule(session: SparkSession)
 
     def numOutputColumns(p: LogicalPlan): Option[Int] = p match {
       case w: DataWritingCommand => Some(w.outputColumnNames.size)
+      case w: V2CreateTablePlan => Some(w.output.size)
       case w: V2WriteCommand => Some(w.query.output.size)
       case u: Union if u.children.nonEmpty => numOutputColumns(u.children.head)
       case _ => None

@@ -17,8 +17,9 @@
 
 package org.apache.spark.sql
 
+import org.apache.spark.SparkConf
 import org.apache.spark.sql.execution.adaptive.{AQEShuffleReadExec, QueryStageExec}
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.{SQLConf, StaticSQLConf}
 
 import org.apache.kyuubi.sql.{FinalStageConfigIsolation, KyuubiSQLConf, MarkNumOutputColumnsRule}
 
@@ -26,6 +27,16 @@ class FinalStageConfigIsolationSuite extends KyuubiSparkSQLExtensionTest {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     setupData()
+  }
+
+  override def sparkConf(): SparkConf = {
+    val conf = super.sparkConf()
+    conf.set(
+      StaticSQLConf.SPARK_SESSION_EXTENSIONS.key,
+      "org.apache.kyuubi.sql.KyuubiSparkSQLExtension,io.delta.sql.DeltaSparkSessionExtension")
+    conf.set("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+
+    conf
   }
 
   test("final stage config set reset check") {
@@ -193,6 +204,46 @@ class FinalStageConfigIsolationSuite extends KyuubiSparkSQLExtensionTest {
 
       withTable("tmp") {
         sql("CREATE TABLE t1 USING PARQUET SELECT /*+ repartition */ 1 AS c1, 'a' AS c2")
+        assert(MarkNumOutputColumnsRule.numOutputColumns(spark).contains("2"))
+        assert(spark.conf.getOption("spark.sql.adaptive.advisoryPartitionSizeInBytes")
+          .contains("7"))
+      }
+
+      sql("SELECT * FROM t1").count()
+      assert(MarkNumOutputColumnsRule.numOutputColumns(spark).isEmpty)
+      assert(spark.conf.getOption("spark.sql.adaptive.advisoryPartitionSizeInBytes")
+        .contains("5"))
+    }
+  }
+
+  test("final stage config isolation write only with delta lake") {
+    withSQLConf(
+      KyuubiSQLConf.FINAL_STAGE_CONFIG_ISOLATION.key -> "true",
+      KyuubiSQLConf.FINAL_STAGE_CONFIG_ISOLATION_WRITE_ONLY.key -> "true",
+      "spark.sql.finalStage.adaptive.advisoryPartitionSizeInBytes" -> "7") {
+      sql("set spark.sql.adaptive.advisoryPartitionSizeInBytes=5")
+      sql("SELECT * FROM t1").count()
+      assert(MarkNumOutputColumnsRule.numOutputColumns(spark).isEmpty)
+      assert(spark.conf.getOption("spark.sql.adaptive.advisoryPartitionSizeInBytes")
+        .contains("5"))
+
+      withTable("tmp") {
+        sql("CREATE TABLE t1 USING DELTA SELECT /*+ repartition */ 1 AS c1, 'a' AS c2")
+        assert(MarkNumOutputColumnsRule.numOutputColumns(spark).contains("2"))
+        assert(spark.conf.getOption("spark.sql.adaptive.advisoryPartitionSizeInBytes")
+          .contains("7"))
+
+        sql("SELECT * FROM t1").count()
+        assert(MarkNumOutputColumnsRule.numOutputColumns(spark).isEmpty)
+        assert(spark.conf.getOption("spark.sql.adaptive.advisoryPartitionSizeInBytes")
+          .contains("5"))
+
+        sql("INSERT INTO TABLE t1 AS SELECT /*+ repartition */ 1 AS c1, 'a' AS c2")
+        assert(MarkNumOutputColumnsRule.numOutputColumns(spark).contains("2"))
+        assert(spark.conf.getOption("spark.sql.adaptive.advisoryPartitionSizeInBytes")
+          .contains("7"))
+
+        spark.createDataFrame(Seq((1, "a"))).write.format("delta").mode("append").saveAsTable("t1")
         assert(MarkNumOutputColumnsRule.numOutputColumns(spark).contains("2"))
         assert(spark.conf.getOption("spark.sql.adaptive.advisoryPartitionSizeInBytes")
           .contains("7"))
