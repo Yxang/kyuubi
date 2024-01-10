@@ -32,12 +32,16 @@ case class MarkNumOutputColumnsRule(session: SparkSession)
       return plan
     }
     if (session.conf.getOption(OUTPUT_NUM_COLUMNS).isDefined) {
-      session.conf.unset(OUTPUT_NUM_COLUMNS)
+      plan match {
+        case p if p.origin.sqlText.exists(_.toLowerCase.contains("using delta")) =>
+          return plan
+        case _ => session.conf.unset(OUTPUT_NUM_COLUMNS)
+      }
     }
 
     def numOutputColumns(p: LogicalPlan): Option[Int] = p match {
       case w: DataWritingCommand => Some(w.outputColumnNames.size)
-      case w: V2CreateTablePlan => Some(w.output.size)
+      case w: V2CreateTablePlan => Some(w.tableSchema.size)
       case w: V2WriteCommand => Some(w.query.output.size)
       case u: Union if u.children.nonEmpty => numOutputColumns(u.children.head)
       case _ => None
