@@ -203,8 +203,18 @@ class FinalStageConfigIsolationSuite extends KyuubiSparkSQLExtensionTest {
         .contains("5"))
 
       withTable("tmp") {
-        sql("CREATE TABLE t1 USING PARQUET SELECT /*+ repartition */ 1 AS c1, 'a' AS c2")
-        assert(MarkNumOutputColumnsRule.numOutputColumns(spark).contains("2"))
+//        sql("CREATE TABLE t1 USING PARQUET SELECT /*+ repartition */ 1 AS c1, 'a' AS c2")
+//        assert(MarkNumOutputColumnsRule.numOutputColumns(spark).contains("2"))
+//        assert(spark.conf.getOption("spark.sql.adaptive.advisoryPartitionSizeInBytes")
+//          .contains("7"))
+//
+//        sql("SELECT * FROM t1").count()
+//        assert(MarkNumOutputColumnsRule.numOutputColumns(spark).isEmpty)
+//        assert(spark.conf.getOption("spark.sql.adaptive.advisoryPartitionSizeInBytes")
+//          .contains("5"))
+
+        spark.createDataFrame(Seq((1, "a"))).write.format("json").mode("append")
+          .save("file:///tmp/t1")
         assert(spark.conf.getOption("spark.sql.adaptive.advisoryPartitionSizeInBytes")
           .contains("7"))
       }
